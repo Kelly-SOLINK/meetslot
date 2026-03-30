@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Meeting invite</title>
+<style>
+  /* ============================================================
+     CONFIG — edit this object to customise the app
+     All user-facing text, branding, and slots live here.
+     No need to touch the HTML or JS below.
+  ============================================================ */
+
+  :root {
+    --brand-primary:   #185FA5;
+    --brand-light:     #E6F1FB;
+    --brand-dark:      #0C447C;
+    --confirm-primary: #1D9E75;
+    --confirm-light:   #E1F5EE;
+    --confirm-dark:    #085041;
+    --font: system-ui, -apple-system, sans-serif;
+    --radius-sm: 8px;
+    --radius-lg: 12px;
+    --border: 0.5px solid #d1d5db;
+    --border-em: 0.5px solid #9ca3af;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: #f9fafb; color: #111; min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 2rem 1rem; }
+  .page { width: 100%; max-width: 500px; }
+
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  .progress { display: flex; gap: 6px; margin-bottom: 2rem; }
+  .prog-dot { height: 3px; flex: 1; border-radius: 2px; background: #e5e7eb; transition: background 0.3s; }
+  .prog-dot.done { background: var(--brand-primary); }
+
+  .meeting-card {
+    border: var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.75rem;
+    background: #fff;
+  }
+  .meeting-eyebrow { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #9ca3af; margin-bottom: 6px; }
+  .meeting-title { font-size: 17px; font-weight: 500; margin-bottom: 6px; }
+  .meeting-meta { font-size: 13px; color: #6b7280; display: flex; gap: 16px; flex-wrap: wrap; }
+  .meta-item { display: flex; align-items: center; gap: 5px; }
+  .meta-icon { width: 13px; height: 13px; color: #9ca3af; flex-shrink: 0; }
+
+  /* company badge — hidden until CONFIG.company is set */
+  .company-badge {
+    display: none;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--brand-light);
+    color: var(--brand-dark);
+    margin-bottom: 10px;
+    width: fit-content;
+  }
+
+  h2 { font-size: 18px; font-weight: 500; margin-bottom: 0.35rem; }
+  .sub { font-size: 14px; color: #6b7280; margin-bottom: 1.5rem; line-height: 1.5; }
+
+  label { font-size: 13px; color: #6b7280; display: block; margin-bottom: 6px; }
+  input[type=text], input[type=email], textarea {
+    width: 100%; padding: 10px 12px; font-size: 14px;
+    border: var(--border-em); border-radius: var(--radius-sm);
+    background: #fff; color: #111; font-family: var(--font);
+    outline: none; transition: border-color 0.15s;
+  }
+  input:focus, textarea:focus { border-color: var(--brand-primary); box-shadow: 0 0 0 3px var(--brand-light); }
+  textarea { resize: none; height: 72px; }
+  .field { margin-bottom: 1.25rem; }
+  .name-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; margin-bottom: 1.25rem; }
+
+  .slot-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 0.5rem; }
+  .slot {
+    border: var(--border-em); border-radius: var(--radius-sm);
+    padding: 11px 14px; cursor: pointer; background: #fff;
+    display: flex; align-items: center; gap: 12px;
+    transition: border-color 0.15s; user-select: none;
+  }
+  .slot:hover { border-color: var(--brand-primary); }
+  .slot.yes { border: 1.5px solid var(--confirm-primary); background: var(--confirm-light); }
+  .slot-check {
+    width: 20px; height: 20px; border-radius: 50%;
+    border: var(--border-em); background: #f3f4f6;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s;
+  }
+  .slot.yes .slot-check { background: var(--confirm-primary); border-color: var(--confirm-primary); }
+  .slot-day { font-size: 12px; color: #6b7280; }
+  .slot-time { font-size: 14px; font-weight: 500; }
+  .slot.yes .slot-day { color: var(--confirm-dark); }
+  .slot.yes .slot-time { color: var(--confirm-dark); }
+
+  .none-work { margin-top: 12px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #6b7280; }
+  .none-check { width: 16px; height: 16px; border-radius: var(--radius-sm); border: var(--border-em); background: #f3f4f6; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .none-check.checked { background: var(--brand-primary); border-color: var(--brand-primary); }
+
+  .availability-box {
+    border: var(--border); border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem; background: #f9fafb;
+    margin-bottom: 1.5rem; display: none;
+  }
+  .availability-box.visible { display: block; }
+  .avail-label { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+
+  .btn-row { display: flex; gap: 8px; margin-top: 1.5rem; }
+  .btn {
+    flex: 1; padding: 10px; font-size: 14px; font-weight: 500;
+    border-radius: var(--radius-sm); cursor: pointer;
+    border: var(--border-em); font-family: var(--font); transition: background 0.1s;
+  }
+  .btn-primary { background: var(--brand-primary); color: var(--brand-light); border-color: var(--brand-primary); }
+  .btn-primary:hover { background: var(--brand-dark); }
+  .btn-ghost { background: transparent; color: #6b7280; }
+  .btn-ghost:hover { background: #f3f4f6; }
+
+  .divider { height: 0.5px; background: #e5e7eb; margin: 1.25rem 0; }
+
+  .confirm-icon { width: 44px; height: 44px; border-radius: 50%; background: var(--confirm-light); display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem; }
+  .status-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #6b7280; margin-bottom: 8px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--confirm-primary); flex-shrink: 0; }
+  .status-dot.pending { background: #d1d5db; }
+
+  footer { margin-top: 2.5rem; text-align: center; font-size: 12px; color: #9ca3af; }
+  footer a { color: #9ca3af; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ============================================================
+       CONFIG — change values here, nothing else needs editing
+  ============================================================ -->
+  <script>
+    const CONFIG = {
+      // Branding — set company to show a badge on the meeting card
+      company: "",                        // e.g. "Acme Corp" — leave "" to hide
+
+      // Organiser
+      organiserName: "Alex Chen",
+
+      // Meeting details
+      meetingTitle: "Q2 planning sync",
+      meetingWeek:  "Week of 14 Apr",
+      meetingDuration: "1 hour",
+
+      // Proposed slots — add or remove as needed
+      slots: [
+        { day: "Monday, 14 April",    time: "10:00 – 11:00" },
+        { day: "Monday, 14 April",    time: "14:00 – 15:00" },
+        { day: "Tuesday, 15 April",   time: "09:00 – 10:00" },
+        { day: "Wednesday, 16 April", time: "11:00 – 12:00" },
+      ],
+
+      // Other respondents (for the confirmation screen social signal)
+      otherRespondents: [
+        { name: "Tom Kim", responded: false },
+      ],
+
+      // Copy — override any label text here
+      copy: {
+        inviteLabel:       "Meeting invite",
+        step1Heading:      "Who are you?",
+        step1Sub:          "So {organiser} knows whose availability this is.",
+        step2Heading:      "Which slots work for you?",
+        step2Sub:          "Select all times you're available. You can pick more than one.",
+        noneWorkLabel:     "None of these work for me",
+        availabilityLabel: "When are you generally free? The organiser will use this to find a new slot.",
+        availabilityHint:  "e.g. Tuesday or Thursday morning, any time after 10am next week...",
+        confirmSub:        "Your availability has been sent to {organiser}. You'll get an email once a time is confirmed — nothing else to do.",
+        footerText:        "Powered by Meetslot",
+        footerLink:        "#",
+      }
+    };
+  </script>
+
+  <!-- Screen 1: Identity -->
+  <div class="screen active" id="r1">
+    <div class="progress">
+      <div class="prog-dot done"></div>
+      <div class="prog-dot"></div>
+      <div class="prog-dot"></div>
+    </div>
+    <div class="meeting-card">
+      <div class="company-badge" id="company-badge"></div>
+      <div class="meeting-eyebrow" id="mc-label"></div>
+      <div class="meeting-title" id="mc-title"></div>
+      <div class="meeting-meta">
+        <span class="meta-item">
+          <svg class="meta-icon" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="11" height="10" rx="2" stroke="currentColor" stroke-width="1"/><path d="M1 5h11M4 1v2M9 1v2" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+          <span id="mc-week"></span>
+        </span>
+        <span class="meta-item">
+          <svg class="meta-icon" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1"/><path d="M6.5 3.5v3l2 1.5" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+          <span id="mc-duration"></span>
+        </span>
+        <span class="meta-item" style="color:#9ca3af; font-size:12px;">From: <span id="mc-organiser"></span></span>
+      </div>
+    </div>
+    <h2 id="s1-heading"></h2>
+    <p class="sub" id="s1-sub"></p>
+    <div class="name-row">
+      <div><label>First name</label><input type="text" id="fname" placeholder="Sara" /></div>
+      <div><label>Last name</label><input type="text" id="lname" placeholder="Reyes" /></div>
+    </div>
+    <div class="field">
+      <label>Email address</label>
+      <input type="email" id="email" placeholder="sara@example.com" />
+    </div>
+    <div class="btn-row" style="margin-top:0">
+      <button class="btn btn-primary" onclick="goTo('r2')">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Screen 2: Slot selection -->
+  <div class="screen" id="r2">
+    <div class="progress">
+      <div class="prog-dot done"></div>
+      <div class="prog-dot done"></div>
+      <div class="prog-dot"></div>
+    </div>
+    <div class="meeting-card">
+      <div class="company-badge" id="company-badge-2"></div>
+      <div class="meeting-eyebrow" id="mc-label-2"></div>
+      <div class="meeting-title" id="mc-title-2"></div>
+      <div class="meeting-meta">
+        <span class="meta-item">
+          <svg class="meta-icon" viewBox="0 0 13 13" fill="none"><rect x="1" y="2" width="11" height="10" rx="2" stroke="currentColor" stroke-width="1"/><path d="M1 5h11M4 1v2M9 1v2" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+          <span id="mc-week-2"></span>
+        </span>
+        <span class="meta-item">
+          <svg class="meta-icon" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1"/><path d="M6.5 3.5v3l2 1.5" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+          <span id="mc-duration-2"></span>
+        </span>
+      </div>
+    </div>
+    <h2 id="s2-heading"></h2>
+    <p class="sub" id="s2-sub"></p>
+    <div class="slot-list" id="slot-list"></div>
+    <div class="none-work" onclick="toggleNone()">
+      <div class="none-check" id="none-check"></div>
+      <span id="none-label"></span>
+    </div>
+    <div class="availability-box" id="avail-box">
+      <div class="avail-label" id="avail-label"></div>
+      <textarea id="avail-text"></textarea>
+    </div>
+    <div class="btn-row" style="margin-top:0">
+      <button class="btn btn-ghost" onclick="goTo('r1')">← Back</button>
+      <button class="btn btn-primary" onclick="goTo('r3')">Submit →</button>
+    </div>
+  </div>
+
+  <!-- Screen 3: Confirmation -->
+  <div class="screen" id="r3">
+    <div class="confirm-icon">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M4 11l5 5 9-9" stroke="#1D9E75" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <h2>Thanks, <span id="confirm-name"></span>!</h2>
+    <p class="sub" id="confirm-sub" style="margin-bottom:1.5rem;"></p>
+    <div class="divider"></div>
+    <div id="respondent-status"></div>
+    <div class="divider"></div>
+    <p style="font-size:13px; color:#9ca3af; line-height:1.6;">
+      A confirmation has been sent to <span id="confirm-email" style="color:#6b7280;"></span>. You can close this page.
+    </p>
+  </div>
+
+  <footer><a id="footer-link" href="#"><span id="footer-text"></span></a></footer>
+</div>
+
+<script>
+  /* ── Boot: render everything from CONFIG ── */
+  function t(str) {
+    return str.replace('{organiser}', CONFIG.organiserName);
+  }
+
+  function renderMeetingCards() {
+    ['', '-2'].forEach(suffix => {
+      const badge = document.getElementById('company-badge' + (suffix === '' ? '' : suffix));
+      if (CONFIG.company) {
+        badge.textContent = CONFIG.company;
+        badge.style.display = 'block';
+      }
+      const label = document.getElementById('mc-label' + suffix);
+      if (label) label.textContent = CONFIG.copy.inviteLabel;
+      const title = document.getElementById('mc-title' + suffix);
+      if (title) title.textContent = CONFIG.meetingTitle;
+      const week = document.getElementById('mc-week' + suffix);
+      if (week) week.textContent = CONFIG.meetingWeek;
+      const dur = document.getElementById('mc-duration' + suffix);
+      if (dur) dur.textContent = CONFIG.meetingDuration;
+    });
+    const org = document.getElementById('mc-organiser');
+    if (org) org.textContent = CONFIG.organiserName;
+  }
+
+  function renderScreen1() {
+    document.getElementById('s1-heading').textContent = CONFIG.copy.step1Heading;
+    document.getElementById('s1-sub').textContent = t(CONFIG.copy.step1Sub);
+  }
+
+  function renderScreen2() {
+    document.getElementById('s2-heading').textContent = CONFIG.copy.step2Heading;
+    document.getElementById('s2-sub').textContent = CONFIG.copy.step2Sub;
+    document.getElementById('none-label').textContent = CONFIG.copy.noneWorkLabel;
+    document.getElementById('avail-label').textContent = CONFIG.copy.availabilityLabel;
+    document.getElementById('avail-text').placeholder = CONFIG.copy.availabilityHint;
+
+    const list = document.getElementById('slot-list');
+    CONFIG.slots.forEach(slot => {
+      const el = document.createElement('div');
+      el.className = 'slot';
+      el.onclick = function() { toggleSlot(this); };
+      el.innerHTML = `
+        <div class="slot-check">
+          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+            <path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="slot-info">
+          <div class="slot-day">${slot.day}</div>
+          <div class="slot-time">${slot.time}</div>
+        </div>`;
+      list.appendChild(el);
+    });
+  }
+
+  function renderFooter() {
+    document.getElementById('footer-text').textContent = CONFIG.copy.footerText;
+    document.getElementById('footer-link').href = CONFIG.copy.footerLink;
+  }
+
+  renderMeetingCards();
+  renderScreen1();
+  renderScreen2();
+  renderFooter();
+
+  /* ── Navigation ── */
+  function goTo(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (id === 'r3') renderConfirmation();
+  }
+
+  function renderConfirmation() {
+    const fn = document.getElementById('fname').value || 'there';
+    const em = document.getElementById('email').value || '';
+    document.getElementById('confirm-name').textContent = fn;
+    document.getElementById('confirm-email').textContent = em;
+    document.getElementById('confirm-sub').textContent = t(CONFIG.copy.confirmSub);
+
+    const statusEl = document.getElementById('respondent-status');
+    statusEl.innerHTML = '';
+    const pending = CONFIG.otherRespondents.filter(r => !r.responded);
+    if (pending.length > 0) {
+      const waitRow = document.createElement('div');
+      waitRow.className = 'status-row';
+      waitRow.innerHTML = `<div class="status-dot"></div> Waiting on ${pending.length} other response${pending.length > 1 ? 's' : ''}`;
+      statusEl.appendChild(waitRow);
+      pending.forEach(r => {
+        const row = document.createElement('div');
+        row.className = 'status-row';
+        row.style.color = '#9ca3af';
+        row.innerHTML = `<div class="status-dot pending"></div> ${r.name} — not yet responded`;
+        statusEl.appendChild(row);
+      });
+    }
+  }
+
+  /* ── Slot toggling ── */
+  function toggleSlot(el) {
+    if (noneActive) return;
+    el.classList.toggle('yes');
+  }
+
+  let noneActive = false;
+  function toggleNone() {
+    noneActive = !noneActive;
+    const check = document.getElementById('none-check');
+    const box = document.getElementById('avail-box');
+    if (noneActive) {
+      check.classList.add('checked');
+      check.innerHTML = '<svg width="9" height="7" viewBox="0 0 10 8" fill="none"><path d="M1 4l3 3 5-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      box.classList.add('visible');
+      document.querySelectorAll('.slot').forEach(s => {
+        s.classList.remove('yes');
+        s.style.opacity = '0.35';
+        s.style.pointerEvents = 'none';
+      });
+    } else {
+      check.classList.remove('checked');
+      check.innerHTML = '';
+      box.classList.remove('visible');
+      document.querySelectorAll('.slot').forEach(s => {
+        s.style.opacity = '';
+        s.style.pointerEvents = '';
+      });
+    }
+  }
+</script>
+</body>
+</html>
